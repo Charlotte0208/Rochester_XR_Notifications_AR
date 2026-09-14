@@ -1,0 +1,15 @@
+node_modules/
+dist/
+study_logs/
+public/media/*.mp4
+
+.agents/
+.codex/
+.codex-run/
+
+data/*.cer
+data/*.pfx
+
+.DS_Store
+Thumbs.db
+npm-debug.log*

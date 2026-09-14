@@ -1,0 +1,23 @@
+{
+  "name": "rochester-xr-notifications",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "verify:room": "node scripts/verify-room.mjs",
+    "verify:demonstration": "node scripts/verify-demonstration.mjs",
+    "test": "npm run verify:room && npm run verify:demonstration",
+    "test:browser": "node scripts/verify-browser.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "three": "^0.184.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.184.1",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.16"
+  }
+}
