@@ -1,20 +1,20 @@
-# AR Cue Familiarization — Meta Quest 3
+# AR Familiarization
 
-A five-minute WebXR passthrough demonstration built with Three.js. The app locates headset-supplied floor and table surfaces, asks the user to confirm the room setup, and introduces five visual and audio features using the supplied delivery bag and focus moon models.
+A simple Meta Quest 3 WebXR passthrough demonstration: **enter AR, detect a real table, and watch all five features play automatically**. No virtual table is rendered. Playback cannot start without an active AR session and a detected tabletop; there is no desktop playback bypass.
 
-## Five features
-
-Each feature lasts 60 seconds: a semi-transparent white title appears for 3 seconds, then disappears before the objects appear. The title sits 1.4 m away and covers 40% of the projected view area; small transparent captions identify each variation.
+## Sequence
 
 1. **Two types of objects:** delivery bag and focus moon together.
-2. **Size:** one delivery bag at 14, 28, and 48 cm on its longest side.
-3. **Distance and placement:** near, middle, far, tabletop, and floor positions.
-4. **Motion:** still, slow floating, faster floating, approaching, and receding.
-5. **Sound:** matched appearance cycles with silence, one subtle chime, or repeated spatial chimes.
+2. **Size:** Small, Medium, and Large, with a 1 : 3.5 : 8 size ratio and no measurement suffix.
+3. **Distance and placement:** the nearest, middle, and farthest usable positions on the scanned tabletop.
+4. **Motion:** still, slow floating, faster floating, then one arc from far upper left to the table and out to the upper right.
+5. **Sound:** one silent appearance, one appearance with a brief chime, then one sustained appearance with seven faster chimes. The caption stays **Sound** throughout.
 
-## Setup
+Each feature lasts 18 seconds: a 3-second translucent white English title, then 15 seconds of objects. The full sequence lasts 90 seconds. Category panels are half their previous area (about 6.7% of the projected view), at 1.4 m. Start/end panels use large centred text without smaller subtitles. Size, distance, and sound each have three 5-second variations; motion has four 3.75-second variations. Silent and single-sound objects each appear once, separated by a brief gap; only the final sound condition repeats its short chime, every 0.75 seconds. Stationary objects use the detected tabletop and adapt to its boundary; the final movement deliberately travels above and outside it. All text is English. Audio consists of nonverbal spatial chimes.
 
-Use **Node.js 22.12+** and **PowerShell 7.4+** on Windows. From the project folder:
+## Run
+
+Use Node.js 22.12+ and PowerShell 7.4+ on Windows:
 
 ```powershell
 npm ci
@@ -22,33 +22,13 @@ pwsh -File scripts/setup-https.ps1
 npm run dev
 ```
 
-The HTTPS script creates a local development certificate and prints the Quest URL on port **5182**. Run it again after changing Wi-Fi networks, then restart the development server. Use `-IpAddress <Wi-Fi IPv4>` if automatic address selection is ambiguous.
+Open the printed HTTPS URL on port **5182** in Meta Quest Browser, using the same Wi-Fi as the computer. Accept the local development certificate or use a trusted certificate. The network must allow local LAN traffic.
 
-Open the printed HTTPS URL in **Meta Quest Browser on the same Wi-Fi** as the computer. Accept the local certificate warning, or provide a certificate trusted by the headset. Local network traffic to the server must be allowed.
+Select **Enter AR**, allow room access, and look steadily at the tabletop. Detection starts playback automatically. If needed and supported, the app opens the headset room scan once. If no table data is available, include the table in Quest **Space Setup** and re-enter. Browser/OS permission prompts still require your response. Use Quest's system controls to exit AR.
 
-For the desktop preview, open [https://localhost:5182/](https://localhost:5182/). Desktop playback uses a simulated room.
+To view the entry page on a computer, run `npm run desktop` and open [http://127.0.0.1:5183/](http://127.0.0.1:5183/). This address listens only on the local computer. It does not display a simulated table or play the cues. Use the HTTPS address on Quest 3 for scanning and playback.
 
-## Room setup
-
-1. Select **Enter passthrough AR** and allow room access.
-2. Look around to locate the floor and table. Confirm highlighted unlabelled surfaces with a trigger: floor first, then table.
-3. If surfaces are missing, press **Left Y** for room capture when supported, or complete **Space Setup / Room Setup** in Quest settings and re-enter AR.
-4. Check the marked surfaces, face the table with clear floor nearby, and press a trigger to begin. Remain comfortably in place; look down for the floor example.
-
-## Controls
-
-| Input | Action |
-| --- | --- |
-| Either trigger | Confirm, start, pause/resume, or restart after completion |
-| Left X / Right A | Previous / next feature |
-| Right B | Replay the current feature and its title |
-| Left Y | Rescan the room |
-| Browser Exit AR | Exit the immersive session |
-| Desktop Space / arrows / R | Pause/resume / previous-next / replay |
-
-Desktop buttons provide the same playback actions. Drag and scroll to inspect the landing preview.
-
-## Verification
+## Verify
 
 ```powershell
 npm test
@@ -56,6 +36,6 @@ npm run build
 npm run test:browser
 ```
 
-Browser checks require a running development server, Playwright (`npm install --no-save playwright`), and Chromium (`npx playwright install chromium`). Reports and screenshots are saved in `.codex-run/browser/`.
+Browser checks need a running server, Playwright, and Chromium. Install them if needed with `npm install --no-save playwright` and `npx playwright install chromium`.
 
-Physical Quest 3 operation has not yet been validated. Desktop and mocked-XR checks do not establish real passthrough, room alignment, viewing comfort, or audible headset output. Placement uses available plane boundaries; hit-test-only setup has unknown surface extents and does not provide full-room collision avoidance or physical occlusion.
+Desktop and mocked-XR checks do not replace physical Quest testing. The app uses headset-supplied planes or stable hit-test samples, not camera-image recognition. Hit-test-only placement has unknown surface boundaries; full-room collision avoidance and physical occlusion are not provided.

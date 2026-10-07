@@ -1,8 +1,8 @@
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { createPlacementPlan, type DemonstrationPlacement, type PlacementPlan } from "./placement";
-import { soundAppearance, variationAt } from "./sequence";
+import { createPlacementPlan, type DemonstrationPlacement, type ModelFootprints, type PlacementPlan } from "./placement";
+import { DEMONSTRATION_SECONDS, OBJECT_SIZES, soundAppearance, variationAt } from "./sequence";
 import { VariationCaption } from "./VariationCaption";
 
 export { FEATURE_NAMES, TOTAL_SECONDS } from "./sequence";
@@ -12,7 +12,7 @@ const MODEL_PATHS = [
   "/assets/notification-objects/uber_eats_delivery_bag.glb",
   "/assets/notification-objects/apple_focus_moon.glb"
 ] as const;
-const BASE_SIZE = 0.28;
+const BASE_SIZE = OBJECT_SIZES[1];
 
 export type DemonstrationFrame = { label: string; objectCount: number };
 
@@ -22,16 +22,12 @@ export class Demonstration {
   private readonly sources: THREE.Group[] = [];
   private readonly caption = new VariationCaption();
   private readonly captionPosition = new THREE.Vector3();
+  private readonly audioPosition = new THREE.Vector3();
   private bag: THREE.Group | null = null;
   private moon: THREE.Group | null = null;
   private loadPromise: Promise<void> | null = null;
-  private placement: DemonstrationPlacement = {
-    floorY: 0,
-    tablePosition: new THREE.Vector3(0, 0.75, -1.25),
-    viewerPosition: new THREE.Vector3(0, 1.6, 0),
-    forward: new THREE.Vector3(0, 0, -1)
-  };
-  private plan: PlacementPlan = createPlacementPlan(this.placement);
+  private placement: DemonstrationPlacement | null = null;
+  private plan: PlacementPlan | null = null;
   private context: AudioContext | null = null;
   private panner: PannerNode | null = null;
   private readonly sounding = new Set<OscillatorNode>();
@@ -72,26 +68,47 @@ export class Demonstration {
     results.forEach((result) => {
       if (result.status === "fulfilled") this.sources.push(result.value.scene);
     });
-    this.bag = createNormalizedModel(this.sources[0], "Delivery bag");
-    this.moon = createNormalizedModel(this.sources[1], "Focus moon");
-    this.group.add(this.bag, this.moon);
+    try {
+      this.bag = createNormalizedModel(this.sources[0], "Delivery bag");
+      this.moon = createNormalizedModel(this.sources[1], "Focus moon");
+      this.group.add(this.bag, this.moon);
+      if (this.placement) this.plan = createPlacementPlan(this.placement, this.modelFootprints());
+    } catch (error) {
+      this.bag?.removeFromParent();
+      this.moon?.removeFromParent();
+      this.bag = this.moon = null;
+      disposeModels(this.sources);
+      this.sources.length = 0;
+      throw error;
+    }
   }
 
   setPlacement(input: DemonstrationPlacement): void {
     const placement = {
-      floorY: input.floorY,
       tablePosition: input.tablePosition.clone(),
+      tableQuaternion: input.tableQuaternion?.clone(),
       viewerPosition: input.viewerPosition.clone(),
       forward: input.forward.clone(),
-      floorPolygon: input.floorPolygon?.map((point) => point.clone()),
       tablePolygon: input.tablePolygon?.map((point) => point.clone())
     };
-    const plan = createPlacementPlan(placement);
+    const plan = createPlacementPlan(placement, this.modelFootprints());
     this.placement = placement;
     this.plan = plan;
   }
 
+  private modelFootprints(): ModelFootprints {
+    return {
+      bag: this.bag?.userData.normalizedFootprint ?? { width: 1, depth: 1 },
+      moon: this.moon?.userData.normalizedFootprint ?? { width: 1, depth: 1 }
+    };
+  }
+
   render(featureIndex: number, demoSeconds: number): DemonstrationFrame {
+    const plan = this.plan;
+    if (!plan) {
+      this.hide();
+      return { label: "Waiting for a scanned table", objectCount: 0 };
+    }
     if (!this.bag || !this.moon || this.disposed) return { label: "Loading required models", objectCount: 0 };
     if (featureIndex !== this.lastFeature || demoSeconds < this.lastSeconds) {
       this.stopAudio();
@@ -102,87 +119,90 @@ export class Demonstration {
     this.group.visible = true;
     this.bag.visible = true;
     this.moon.visible = false;
-    this.place(this.bag, this.plan.middle, BASE_SIZE);
+    this.place(this.bag, plan.middle, BASE_SIZE * plan.scale);
     let label = "";
 
     if (featureIndex === 0) {
       this.moon.visible = true;
-      this.bag.position.addScaledVector(this.plan.right, -0.22);
-      this.place(this.moon, this.plan.middle, BASE_SIZE);
-      this.moon.position.addScaledVector(this.plan.right, 0.22);
+      this.bag.position.addScaledVector(plan.right, -plan.pairOffset);
+      this.place(this.moon, plan.middle, BASE_SIZE * plan.scale);
+      this.moon.position.addScaledVector(plan.right, plan.pairOffset);
       label = "Delivery bag and focus moon";
     } else if (featureIndex === 1) {
       const variation = variationAt(demoSeconds, 3);
-      const sizes = [0.14, BASE_SIZE, 0.48];
+      const sizes = OBJECT_SIZES.map(size => size * plan.scale);
       this.bag.scale.setScalar(sizes[variation.index]);
-      label = `${["Small", "Medium", "Large"][variation.index]} · ${Math.round(sizes[variation.index] * 100)} cm (longest side)`;
+      label = ["Small", "Medium", "Large"][variation.index];
     } else if (featureIndex === 2) {
-      const variation = variationAt(demoSeconds, 5);
-      const positions = [this.plan.near, this.plan.middle, this.plan.far, this.plan.tabletop, this.plan.floor];
+      const variation = variationAt(demoSeconds, 3);
+      const positions = [plan.near, plan.distanceMiddle, plan.far];
       this.bag.position.copy(positions[variation.index]);
-      if (variation.index < 3) {
-        const distance = Math.hypot(
-          this.bag.position.x - this.placement.viewerPosition.x,
-          this.bag.position.z - this.placement.viewerPosition.z
-        );
-        label = `${["Near", "Mid-distance", "Far"][variation.index]} · ${distance.toFixed(2)} m horizontal`;
-      } else {
-        label = variation.index === 3 ? "On the identified table" : "On the identified floor";
-      }
+      label = `${["Near", "Middle", "Far"][variation.index]} position on the table`;
     } else if (featureIndex === 3) {
       const variation = variationAt(demoSeconds, 4);
       label = ["Still", "Slow floating movement", "Faster floating movement", "Approaching and moving away"][variation.index];
       if (variation.index === 1 || variation.index === 2) {
         // Same path and amplitude in both conditions; only speed changes.
-        const period = variation.index === 1 ? 8 : 2.5;
+        const period = variation.index === 1 ? 4 : 1.2;
         const phase = variation.seconds * Math.PI * 2 / period;
-        this.bag.position.y += 0.075 * Math.sin(phase);
+        this.bag.position.addScaledVector(plan.up, 0.075 * plan.scale * (1 - Math.cos(phase)));
       } else if (variation.index === 3) {
-        // Start at mid-distance; remain inside the same measured near/far interval.
-        const mix = 0.5 - 0.5 * Math.sin(variation.seconds * Math.PI * 2 / 9);
-        this.bag.position.lerpVectors(this.plan.near, this.plan.far, mix);
+        // One arrival, a brief landing, then one departure. Never wrap or oscillate.
+        const progress = THREE.MathUtils.clamp(variation.seconds / (DEMONSTRATION_SECONDS / 4), 0, 1);
+        if (progress < 0.45) {
+          const t = THREE.MathUtils.smoothstep(progress / 0.45, 0, 1);
+          plan.arrival.getPoint(t, this.bag.position);
+        } else if (progress <= 0.55) {
+          this.bag.position.copy(plan.middle);
+        } else {
+          const t = THREE.MathUtils.smoothstep((progress - 0.55) / 0.45, 0, 1);
+          plan.departure.getPoint(t, this.bag.position);
+        }
       }
     } else if (featureIndex === 4) {
       const variation = variationAt(demoSeconds, 3);
-      const appearance = soundAppearance(variation.seconds);
+      const appearance = soundAppearance(variation.seconds, variation.index);
       this.bag.visible = appearance.visible;
-      label = ["Silent", "One subtle chime", "Repeated subtle chimes"][variation.index];
+      label = "Sound";
       const soundKey = `${variation.index}:${appearance.cycle}`;
       const audible = appearance.visible && (variation.index === 2 || (variation.index === 1 && appearance.cycle === 0));
       if (soundKey !== this.lastSoundKey) {
         this.lastSoundKey = soundKey;
-        if (audible) this.playChime(this.bag.position);
+        if (audible) this.playChime();
       }
     } else {
       this.hide();
     }
     // Size and motion keep the caption anchored, so it introduces no extra movement.
-    this.captionPosition.copy(featureIndex === 1 || featureIndex === 3 ? this.plan.middle : this.bag.position);
-    this.captionPosition.y += featureIndex === 1 ? 0.59 : 0.43;
+    this.captionPosition.copy(featureIndex === 1 || featureIndex === 3 ? plan.middle : this.bag.position);
+    this.captionPosition.addScaledVector(plan.up, (featureIndex === 1 ? OBJECT_SIZES[2] : 0.43) * plan.scale + 0.11);
     this.caption.update(label, this.captionPosition,
-      this.group.visible && featureIndex > 0 && this.bag.visible);
+      this.group.visible && featureIndex > 0 && (featureIndex === 4 || this.bag.visible));
     return { label, objectCount: this.group.visible ? Number(this.bag.visible) + Number(this.moon.visible) : 0 };
   }
 
-  /** World-space centre for desktop framing; measured placements remain unchanged. */
+  /** World-space cue centre for spatial sound, available after a table is supplied. */
   getFocusPoint(target: THREE.Vector3): THREE.Vector3 {
+    const plan = this.plan;
+    if (!plan) return target;
     if (!this.bag) {
-      target.copy(this.plan.middle);
-      target.y += BASE_SIZE / 2;
+      target.copy(plan.middle);
+      target.addScaledVector(plan.up, BASE_SIZE * plan.scale / 2);
     } else {
       target.copy(this.bag.position);
-      target.y += (this.bag.userData.normalizedHeight ?? 1) * this.bag.scale.y / 2;
+      target.addScaledVector(plan.up, (this.bag.userData.normalizedHeight ?? 1) * this.bag.scale.y / 2);
       if (this.bag.visible && this.moon?.visible) {
         target.add(this.moon.position).multiplyScalar(0.5);
-        target.y += (this.moon.userData.normalizedHeight ?? 1) * this.moon.scale.y / 4;
+        target.addScaledVector(plan.up, (this.moon.userData.normalizedHeight ?? 1) * this.moon.scale.y / 4);
       }
     }
     return this.group.localToWorld(target);
   }
 
   private place(model: THREE.Group, position: THREE.Vector3, size: number): void {
+    if (!this.plan) return;
     model.position.copy(position);
-    model.rotation.set(0, this.plan.yaw, 0);
+    model.quaternion.copy(this.plan.rotation);
     model.scale.setScalar(size);
   }
 
@@ -195,7 +215,7 @@ export class Demonstration {
     this.lastSoundKey = "";
   }
 
-  /** Must be called from the desktop Start or XR select user gesture. */
+  /** Call from the Enter AR user gesture. */
   async unlockAudio(): Promise<void> {
     if (this.disposed) return;
     if (!this.context) {
@@ -233,20 +253,21 @@ export class Demonstration {
     }
   }
 
-  private playChime(position: THREE.Vector3): void {
+  private playChime(): void {
     if (!this.context || !this.panner || this.context.state !== "running") return;
+    const position = this.getFocusPoint(this.audioPosition);
     this.panner.positionX.value = position.x;
-    this.panner.positionY.value = position.y + BASE_SIZE / 2;
+    this.panner.positionY.value = position.y;
     this.panner.positionZ.value = position.z;
     const now = this.context.currentTime;
-    for (const [frequency, delay, volume] of [[660, 0, 0.05], [880, 0.1, 0.028]]) {
+    for (const [frequency, delay, volume] of [[660, 0, 0.05], [880, 0.07, 0.028]]) {
       const oscillator = this.context.createOscillator();
       const envelope = this.context.createGain();
       oscillator.type = "sine";
       oscillator.frequency.value = frequency;
       envelope.gain.setValueAtTime(0, now + delay);
       envelope.gain.linearRampToValueAtTime(volume, now + delay + 0.018);
-      envelope.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.42);
+      envelope.gain.exponentialRampToValueAtTime(0.0001, now + delay + 0.22);
       oscillator.connect(envelope);
       envelope.connect(this.panner);
       this.sounding.add(oscillator);
@@ -256,7 +277,7 @@ export class Demonstration {
         envelope.disconnect();
       };
       oscillator.start(now + delay);
-      oscillator.stop(now + delay + 0.45);
+      oscillator.stop(now + delay + 0.24);
     }
   }
 
@@ -294,6 +315,7 @@ function createNormalizedModel(source: THREE.Group, name: string): THREE.Group {
   if (!Number.isFinite(maximum) || maximum <= 0) throw new Error(`The ${name} model has no usable geometry.`);
   const centre = box.getCenter(new THREE.Vector3());
   model.userData.normalizedHeight = size.y / maximum;
+  model.userData.normalizedFootprint = { width: size.x / maximum, depth: size.z / maximum };
   const normalization = new THREE.Group();
   normalization.scale.setScalar(1 / maximum);
   normalization.position.set(-centre.x / maximum, -box.min.y / maximum, -centre.z / maximum);

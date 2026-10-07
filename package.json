@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "desktop": "vite --mode desktop",
     "build": "tsc && vite build",
     "verify:room": "node scripts/verify-room.mjs",
     "verify:demonstration": "node scripts/verify-demonstration.mjs",

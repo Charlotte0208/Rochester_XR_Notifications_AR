@@ -46,7 +46,7 @@ export function polygonCenter(polygon: readonly THREE.Vector3[]): THREE.Vector3 
   return center;
 }
 
-/** Ray casting also handles concave floor outlines; empty hit-test polygons are unknown. */
+/** Ray casting handles concave measured surfaces; empty hit-test polygons are unknown. */
 export function pointInPolygonXZ(point: THREE.Vector3, polygon: readonly THREE.Vector3[]): boolean {
   if (polygon.length < 3) return false;
   let inside = false;
@@ -74,6 +74,16 @@ export function isHorizontal(quaternion: THREE.Quaternion): boolean {
 export function validTableHeight(tableY: number, floorY: number): boolean {
   const height = tableY - floorY;
   return Number.isFinite(height) && height >= 0.35 && height <= 1.4;
+}
+
+/** Floor coordinates are used only when actually known, never inferred from headset height. */
+export function plausibleTabletop(tableY: number, headY: number, floorY: number | undefined, semantic: boolean): boolean {
+  if (!Number.isFinite(tableY + headY)) return false;
+  if (floorY !== undefined && !validTableHeight(tableY, floorY)) return false;
+  const drop = headY - tableY;
+  // Geometry without a semantic label needs a stronger guard against gazing at the floor.
+  const maximumDrop = floorY === undefined && !semantic ? 0.95 : 1.5;
+  return drop >= 0.12 && drop <= maximumDrop;
 }
 
 export function gazeIntersection(

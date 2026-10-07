@@ -1,4 +1,4 @@
-/** Five one-minute features. The title is included in each minute. */
+/** Five 18-second features, including each three-second title. */
 export const FEATURE_NAMES = [
   "1. Two types of objects",
   "2. Size",
@@ -8,9 +8,11 @@ export const FEATURE_NAMES = [
 ] as const;
 
 export const INTRO_SECONDS = 3;
-export const FEATURE_SECONDS = 60;
+export const FEATURE_SECONDS = 18;
 export const DEMONSTRATION_SECONDS = FEATURE_SECONDS - INTRO_SECONDS;
 export const TOTAL_SECONDS = FEATURE_NAMES.length * FEATURE_SECONDS;
+export const OBJECT_SIZES = [0.08, 0.28, 0.64] as const;
+export const SOUND_REPEAT_SECONDS = 0.75;
 
 export type TimelineState = {
   featureIndex: number;
@@ -49,8 +51,9 @@ export function variationAt(demoSeconds: number, count: number): { index: number
   return { index, seconds: time - index * duration };
 }
 
-/** Identical appearance timing in all sound conditions isolates the sound change. */
-export function soundAppearance(seconds: number): { visible: boolean; cycle: number } {
-  const cycle = Math.floor(Math.max(0, seconds) / 7.5);
-  return { visible: seconds - cycle * 7.5 < 6, cycle };
+/** Silent/single appear once; a brief gap separates them. Only the last condition repeats sound. */
+export function soundAppearance(seconds: number, condition: number): { visible: boolean; cycle: number } {
+  const time = Math.max(0, seconds);
+  if (condition < 2) return {visible: time < DEMONSTRATION_SECONDS / 3 - 0.5, cycle: 0};
+  return {visible: true, cycle: Math.floor(time / SOUND_REPEAT_SECONDS)};
 }

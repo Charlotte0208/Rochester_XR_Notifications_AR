@@ -10,7 +10,9 @@ export interface SessionCallbacks {
 export class ARSession {
   session: XRSession | null = null;
   space: XRReferenceSpace | null = null;
+  floorSpace = false;
   private busy = false;
+  private entryAttempt = 0;
 
   constructor(private renderer: WebGLRenderer, private button: HTMLButtonElement, private callbacks: SessionCallbacks) {
     button.addEventListener("click", () => { if (this.session) void this.end(); else void this.enter(); });
@@ -23,11 +25,11 @@ export class ARSession {
     try {
       if (!window.isSecureContext) throw new Error("Open this page over HTTPS to enter AR on Quest 3.");
       if (!navigator.xr || !await navigator.xr.isSessionSupported("immersive-ar")) {
-        throw new Error("Open this page in Meta Quest Browser for passthrough AR. Desktop preview is available here.");
+        throw new Error("Open this page in Meta Quest Browser. A real tabletop must be detected before playback can start.");
       }
-      this.button.textContent = "Enter passthrough AR";
+      this.button.textContent = "Enter AR";
       this.button.disabled = false;
-      this.callbacks.onStatus("Ready for Meta Quest 3. Allow access to your room when prompted.");
+      this.callbacks.onStatus("Meta Quest 3 ready.");
     } catch (error) {
       this.button.textContent = "Quest Browser required";
       this.callbacks.onStatus(message(error));
@@ -36,6 +38,7 @@ export class ARSession {
 
   async enter(): Promise<void> {
     if (this.busy || this.session || !navigator.xr) return;
+    const attempt = ++this.entryAttempt;
     this.busy = true;
     this.button.disabled = true;
     // Both calls are initiated from the browser click's user activation.
@@ -46,12 +49,14 @@ export class ARSession {
         optionalFeatures: ["local-floor", "plane-detection", "hit-test"],
       });
       this.session = session;
-      session.addEventListener("end", this.ended, { once: true });
+      const activeSession = session;
+      session.addEventListener("end", () => { if (this.session === activeSession) this.ended(); }, { once: true });
       let type: XRReferenceSpaceType = "local-floor";
       try { await session.requestReferenceSpace(type); }
       catch { type = "local"; await session.requestReferenceSpace(type); }
       if (this.session !== session) return;
       this.renderer.xr.setReferenceSpaceType(type);
+      this.floorSpace = type === "local-floor";
       await this.renderer.xr.setSession(session);
       if (this.session !== session) return;
       this.space = this.renderer.xr.getReferenceSpace();
@@ -60,14 +65,18 @@ export class ARSession {
       if (this.session !== session) return;
       this.button.textContent = "Exit AR";
     } catch (error) {
+      if (attempt !== this.entryAttempt) return;
       if (session && this.session === session) {
         try { await session.end(); } catch { this.ended(); }
       }
+      if (attempt !== this.entryAttempt) return;
       this.callbacks.onStatus(`Could not enter AR: ${message(error)}. Allow room access and try again.`);
       this.button.textContent = "Try entering AR again";
     } finally {
-      this.busy = false;
-      this.button.disabled = false;
+      if (attempt === this.entryAttempt) {
+        this.busy = false;
+        this.button.disabled = false;
+      }
     }
   }
 
@@ -88,9 +97,10 @@ export class ARSession {
   private ended = (): void => {
     this.session = null;
     this.space = null;
+    this.floorSpace = false;
     this.busy = false;
     this.button.disabled = false;
-    this.button.textContent = "Enter passthrough AR";
+    this.button.textContent = "Enter AR";
     this.callbacks.onEnd();
   };
 }

@@ -13,4 +13,10 @@ const hosting = {
   headers: {"Permissions-Policy": "xr-spatial-tracking=(self)"},
 };
 
-export default defineConfig({ server: hosting, preview: hosting });
+export default defineConfig(({mode}) => {
+  // A loopback-only desktop preview needs no headset certificate. Quest stays on HTTPS.
+  const server = mode === "desktop"
+    ? {host: "127.0.0.1", port: 5183, strictPort: true}
+    : hosting;
+  return {server, preview: server};
+});
