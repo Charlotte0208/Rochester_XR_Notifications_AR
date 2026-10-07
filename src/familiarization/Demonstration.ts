@@ -163,7 +163,7 @@ export class Demonstration {
       const variation = variationAt(demoSeconds, 3);
       const appearance = soundAppearance(variation.seconds, variation.index);
       this.bag.visible = appearance.visible;
-      label = "Sound";
+      label = ["no sound", "quick sound", "repetitive sound"][variation.index];
       const soundKey = `${variation.index}:${appearance.cycle}`;
       const audible = appearance.visible && (variation.index === 2 || (variation.index === 1 && appearance.cycle === 0));
       if (soundKey !== this.lastSoundKey) {

@@ -233,7 +233,7 @@ for (let condition = 0; condition < 3; condition++) {
     const result = demo.render(4, condition * 5 + seconds);
     const expected = soundAppearance(seconds, condition).visible;
     assert.equal(result.objectCount, Number(expected));
-    assert.equal(result.label, "Sound", "top caption stays unchanged across all sound conditions");
+    assert.equal(result.label, ["no sound", "quick sound", "repetitive sound"][condition], "caption identifies the current sound condition");
     if (expected && !previousVisible) appearances++;
     previousVisible = expected;
   }
@@ -258,5 +258,5 @@ console.log(JSON.stringify({
   status: "passed",
   durationSeconds: TOTAL_SECONDS,
   features: FEATURE_NAMES.length,
-  checks: ["no objects before explicit table placement", "automatic five-feature timeline", "three-second titles", "stationary tabletop footprints", "compact, concave and tilted tables", "eightfold size contrast", "wider distance contrast", "unknown extent stays explicit", "single left-table-right arc", "one appearance per sound condition", "fixed Sound caption", "seven faster repeated chimes", "pause/replay audio", "supplied GLB integrity"]
+  checks: ["no objects before explicit table placement", "automatic five-feature timeline", "three-second titles", "stationary tabletop footprints", "compact, concave and tilted tables", "eightfold size contrast", "wider distance contrast", "unknown extent stays explicit", "single left-table-right arc", "one appearance per sound condition", "three distinct sound captions", "seven faster repeated chimes", "pause/replay audio", "supplied GLB integrity"]
 }, null, 2));

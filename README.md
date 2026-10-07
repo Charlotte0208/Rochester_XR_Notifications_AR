@@ -8,7 +8,7 @@ A simple Meta Quest 3 WebXR passthrough demonstration: **enter AR, detect a real
 2. **Size:** Small, Medium, and Large, with a 1 : 3.5 : 8 size ratio and no measurement suffix.
 3. **Distance and placement:** the nearest, middle, and farthest usable positions on the scanned tabletop.
 4. **Motion:** still, slow floating, faster floating, then one arc from far upper left to the table and out to the upper right.
-5. **Sound:** one silent appearance, one appearance with a brief chime, then one sustained appearance with seven faster chimes. The caption stays **Sound** throughout.
+5. **Sound:** one silent appearance, one appearance with a brief chime, then one sustained appearance with seven faster chimes. The captions are **no sound**, **quick sound**, and **repetitive sound**, respectively.
 
 Each feature lasts 18 seconds: a 3-second translucent white English title, then 15 seconds of objects. The full sequence lasts 90 seconds. Category panels are half their previous area (about 6.7% of the projected view), at 1.4 m. Start/end panels use large centred text without smaller subtitles. Size, distance, and sound each have three 5-second variations; motion has four 3.75-second variations. Silent and single-sound objects each appear once, separated by a brief gap; only the final sound condition repeats its short chime, every 0.75 seconds. Stationary objects use the detected tabletop and adapt to its boundary; the final movement deliberately travels above and outside it. All text is English. Audio consists of nonverbal spatial chimes.
 

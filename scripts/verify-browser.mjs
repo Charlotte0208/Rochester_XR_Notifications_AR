@@ -255,8 +255,8 @@ try {
   for (const result of modelResults) {
     const expectedCount = result.feature === 0 ? 2 : result.feature === 4 && [4.8, 9.8].includes(result.time) ? 0 : 1;
     assert.equal(result.objectCount, expectedCount, JSON.stringify(result));
-    assert.equal(result.captionVisible, result.feature > 0 && (result.feature === 4 || expectedCount > 0), 'Sound caption stays present and unchanged through transitions');
-    if (result.feature === 4) assert.equal(result.label, 'Sound');
+    assert.equal(result.captionVisible, result.feature > 0 && (result.feature === 4 || expectedCount > 0), 'Sound caption stays present through transitions');
+    if (result.feature === 4) assert.equal(result.label, ['no sound', 'quick sound', 'repetitive sound'][Math.floor(result.time / 5)]);
     if (result.feature === 0) assert.deepEqual(result.visible, ['Delivery bag', 'Focus moon']);
     else assert.ok(!result.visible.includes('Focus moon'));
   }
@@ -276,7 +276,7 @@ try {
   checks.push('Isolated GLBs remain hidden without placement; an explicit test fixture verifies all five features, size ratios and supported geometry');
   assert.equal(modelAndAudio.runningAudio, true);
   assert.deepEqual(audioResults.map(result => result.scheduledOscillators), [0, 0, 2, 2, 2, 4, 6, 8, 10, 12, 14, 16, 16]);
-  checks.push('Real Web Audio: silent once without audio, one short chime, then seven faster chimes; top caption stays Sound');
+  checks.push('Real Web Audio: silent once without audio, one short chime, then seven faster chimes; captions identify each sound condition');
 
   const panelChecks = await page.evaluate(async () => {
     const { SpatialPanel } = await import('/src/ui/SpatialPanel.ts');
